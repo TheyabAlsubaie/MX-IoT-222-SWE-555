@@ -1,0 +1,17 @@
+@startuml
+class SecurityDevice {}
+class Sensor {}
+class Floodlight {}
+class NFCCardReader {}
+class CloudKeyDevice {}
+class CloudServer {}
+class SoundAlarmDevice {}
+Floodlight <-- Sensor : triggers upon movement
+NFCCardReader -> SecurityDevice : Disarm
+NFCCardReader --> CloudKeyDevice : log of entry
+Sensor --> CloudKeyDevice : log of movement
+SecurityDevice -> SecurityDevice : Arm/Disarm
+SecurityDevice --> CloudKeyDevice : log of status and Intrusion
+SoundAlarmDevice <--SecurityDevice  : Triggers upon intrusion
+CloudKeyDevice -> CloudServer: Synchronizes status
+@enduml

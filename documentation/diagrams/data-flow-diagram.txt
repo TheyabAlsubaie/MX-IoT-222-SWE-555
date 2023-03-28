@@ -1,0 +1,29 @@
+@startuml
+title Smart Home Security System - Data Flow Diagram
+
+actor "Homeowner"
+rectangle "Smart Home Security Ecosystem" {
+  rectangle "Sensors"
+  rectangle "Siren"
+  rectangle "Security Device"
+  rectangle "MQTT Broker"
+  rectangle "Cloud Key Device"
+  rectangle "Flood Lights"
+  rectangle "NFC Card Reader"
+}
+rectangle "Cloud" {
+  rectangle "Server"
+}
+
+"Homeowner" --> "Security Device" : Control
+"Homeowner" --> "Server" : view stats
+"Sensors" --> "MQTT Broker" : sensed movement
+"Siren" <-- "MQTT Broker" : Trigger alarm Turn-off
+"MQTT Broker" <-- "Security Device" : Trigger alarm Turn-off
+"Security Device" --> "MQTT Broker" : system status
+"Security Device" <-- "MQTT Broker" : NFC Card entry
+"Cloud Key Device" <-- "MQTT Broker" : subscription data
+"Flood Lights" <-- "MQTT Broker" : sensed movements
+"NFC Card Reader" --> "MQTT Broker" : entry attempts data
+"Cloud Key Device" --> "Server" : Synchronizes Status
+@enduml
