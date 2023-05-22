@@ -1,0 +1,25 @@
+from realhttp import *		#comment, import realhttp library in order to communicate via http to outside of PacketTracer simulation
+from time import *
+
+url = "http://127.0.0.1/s2/set.php?o="	#comment, the address of the local server representing the cloud dashboard
+
+def send(action):			#comment, receive a variable containing the parameter to be passed to the cloud via http
+	http = RealHTTPClient()	#comment, create http object
+	urlWithAction = url + action	#comment, prepare the full url of the cloud server that contains the received parameters to trigger the correct function
+	http.get(urlWithAction)	#comment, invoke http connection to the full url
+
+	
+def onHTTPDone(status, data):
+	print("status: " + str(status))
+	print("data: " + data)
+
+def main():
+	
+
+
+	#comment, infinite loop with moderate delay
+	while True:
+		sleep(3600)
+
+if __name__ == "__main__":
+	main()

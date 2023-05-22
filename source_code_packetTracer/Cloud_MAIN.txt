@@ -1,0 +1,140 @@
+import mqttclient							#comment, import mqtt library in order for mqtt comuunication to function properly
+import cloud							#comment, import cloud, in order for us to communication the Smart Home Security status to the cloud
+from time import *				
+from physical import *
+
+
+
+
+broker_add ='192.168.25.2'						#comment, Broker Address
+username= 'user1'							#comment, Username
+password = '1234'							#comment, Password
+topic1 = 'sensor1'							#comment, these topics represent the system status
+topic2 = 'sensor2'							#comment, that needs to be relayed to the cloud
+topic3 = 'sensor3'
+topic4 = 'sensor4'
+topic5 = 'sensor5'
+topic6 = 'sensor6'
+topic7 = 'sensor7'
+topic8 = 'sensor8'
+topic9 = 'gate'
+topic10 = 'guard'
+
+
+
+def on_connect(status, msg, packet):			#show connection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_disconnect(status, msg, packet):			#show disconnection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_subscribe(status, msg, packet):			#show subscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_unsubscribe(status, msg, packet):		#show unsubscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_publish(status, msg, packet):			#show publishing status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_message_received(status, msg, packet):  #Invoked when new message received
+	# check received message and take action
+	if status == "Success":
+		if(packet['topic'] == topic1):			#comment, the below code is used to identify which topic are
+			cloud.send("s1&v="+packet['payload'])	#comment, we receiving, and then relaying the correct
+							#comment, parameter to the cloud function
+		if(packet['topic'] == topic2):			#comment, to sync the system status with the cloud
+			cloud.send("s2&v="+packet['payload'])
+			
+		if(packet['topic'] == topic3):
+			cloud.send("s3&v="+packet['payload'])
+			
+		if(packet['topic'] == topic4):
+			cloud.send("s4&v="+packet['payload'])
+			
+		if(packet['topic'] == topic5):
+			cloud.send("s5&v="+packet['payload'])
+			
+		if(packet['topic'] == topic6):
+			cloud.send("s6&v="+packet['payload'])
+			
+		if(packet['topic'] == topic7):
+			cloud.send("s7&v="+packet['payload'])
+			
+		if(packet['topic'] == topic8):
+			cloud.send("s8&v="+packet['payload'])
+			
+		if(packet['topic'] == topic9):
+			cloud.send("ge&v="+packet['payload'])
+			
+		if(packet['topic'] == topic10):
+			cloud.send("a&v="+packet['payload'])
+			
+
+	elif status == "" or status == "Error":
+		print msg
+	print msg
+		
+
+
+
+		
+def main():
+	
+	#delay(60000)
+	mqttclient.init()
+	mqttclient.onConnect(on_connect)
+	mqttclient.onDisconnect(on_disconnect)
+	mqttclient.onSubscribe(on_subscribe)
+	mqttclient.onUnsubscribe(on_unsubscribe)
+	mqttclient.onPublish(on_publish)
+	mqttclient.onMessageReceived(on_message_received)
+	print('Client Initialized')
+	mqttclient.connect(broker_add,username,password)
+	while not mqttclient.state()["connected"]:		#wait until connected
+ 		pass											#do nothing
+	
+	mqttclient.subscribe(topic1)			#comment, subscribe to all the required topics
+	delay(200)					#comment, and have a small delay to avoid flooding the broker
+	mqttclient.subscribe(topic2)
+	delay(200)
+	mqttclient.subscribe(topic3)
+	delay(200)
+	mqttclient.subscribe(topic4)
+	delay(200)
+	mqttclient.subscribe(topic5)
+	delay(200)
+	mqttclient.subscribe(topic6)
+	delay(200)
+	mqttclient.subscribe(topic7)
+	delay(200)
+	mqttclient.subscribe(topic8)
+	delay(200)
+	mqttclient.subscribe(topic9)
+	delay(200)
+	mqttclient.subscribe(topic10)
+	delay(200)
+	
+	while True:
+		delay(1000)
+		
+if __name__ == "__main__":
+	main()

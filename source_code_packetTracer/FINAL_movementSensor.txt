@@ -1,0 +1,91 @@
+import mqttclient								#comment, import mqtt library in order for mqtt comuunication to function properly
+from time import *
+from physical import *
+from gpio import *
+
+
+brokerAddress ='192.168.25.2'							#comment, Broker IP Address
+username= 'user1'								#comment, Username of the broker
+password = '1234'								#comment, Password to connect with the broker
+delayTime = 100       								# var delayTime
+xDistance= 100    								# sensing distance X axis
+yDistance= 100     								# sensing distance Y axis
+prevState=0								#comment, previous sensed status, 0 = no object while 1 means there is an object
+topic = 'sensor1'								# topic name to publish to
+
+def on_connect(status, msg, packet):			#show connection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_disconnect(status, msg, packet):			#show disconnection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_subscribe(status, msg, packet):			#show subscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_unsubscribe(status, msg, packet):		#show unsubscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_publish(status, msg, packet):			#show publishing status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_message_received(status, msg, packet):  #Invoked when new message received
+	# check received message and take action
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	
+	elif status == "":
+		print msg
+	
+	
+def looping():
+	global prevState					#comment, to access the variable in order to assess whether this is the first detection or continous presence of an object infront of the sensor
+	devices = devicesAt( getCenterX(), getCenterY(), xDistance, Y_DISTANCE) # get devices nearby
+	detectedObjects = len(devices) # get the number of devices
+	if(detectedObjects>1):				#comment, if devices detected are more than one ( the sensor is always detected as the first device)
+		currentState=1				#comment, the sensor has detected an object
+	else:
+		currentState=0				#comment, an object has left the sensor perimeter
+
+	if(currentState!=prevState):				#comment, if this event is new, publish to broker
+		prevState=currentState
+		mqttclient.publish(topic,str(currentState),'2')
+
+		
+def main():
+	mqttclient.init()
+	mqttclient.onConnect(on_connect)
+	mqttclient.onDisconnect(on_disconnect)
+	mqttclient.onSubscribe(on_subscribe)
+	mqttclient.onUnsubscribe(on_unsubscribe)
+	mqttclient.onPublish(on_publish)
+	mqttclient.onMessageReceived(on_message_received)
+	print('Client Initialized')
+	mqttclient.connect(brokerAddress,username,password)
+	while not mqttclient.state()["connected"]:		#wait until connected to mqtt broker
+ 		pass				#do nothing
+ 
+
+	while True:
+		looping()				#comment, keep checking for objects near the sensor
+		delay(delayTime);			#comment, 100ms delay
+		
+if __name__ == "__main__":
+	main()

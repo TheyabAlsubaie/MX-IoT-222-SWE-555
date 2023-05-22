@@ -1,0 +1,90 @@
+import mqttclient							#comment, import mqtt library in order for mqtt comuunication to function properly
+from time import *
+from gpio import *
+from physical import *
+
+
+
+
+brokerAddress ='192.168.25.2'						#comment, Broker IP Address
+username= 'user1'							#comment, Username
+password = '1234'							#comment, Password
+topic = 'siren'							#comment, Subscription topic siren
+sirenStatus = 0							#comment,  default siren status
+defaultDelay = 1000							#comment,  loop delay duration
+
+def on_connect(status, msg, packet):			#show connection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_disconnect(status, msg, packet):			#show disconnection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_subscribe(status, msg, packet):			#show subscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_unsubscribe(status, msg, packet):		#show unsubscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_publish(status, msg, packet):			#show publishing status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_message_received(status, msg, packet):  #Invoked when new message received
+								#comment,  check received message and take action
+	if status == "Success":
+		if(packet['topic'] == topic):				#comment, upon mqtt messages received for the subscribed topic
+			if(packet['payload'] == '1'):			#comment, if the value was true then relay the value to activate the siren and vise-versa
+				setAlarm(1)
+			elif(packet['payload'] == '0'):
+				setAlarm(0)
+	elif status == "" or status == "Error":
+		print msg
+	print msg
+		
+
+def setAlarm(value):							#comment, a method to control siren state
+	if value==1:						#comment, if value received from MQTT receive method was true
+		digitalWrite(1, HIGH)				#comment, then activate the siren and vise-versa
+	elif value==0:
+		digitalWrite(1, LOW)
+
+
+		
+def main():
+	global sirenStatus						#comment, prepare access to global variables
+	mqttclient.init()
+	mqttclient.onConnect(on_connect)
+	mqttclient.onDisconnect(on_disconnect)
+	mqttclient.onSubscribe(on_subscribe)
+	mqttclient.onUnsubscribe(on_unsubscribe)
+	mqttclient.onPublish(on_publish)
+	mqttclient.onMessageReceived(on_message_received)
+	print('Client Initialized')
+	mqttclient.connect(brokerAddress,username,password)
+	while not mqttclient.state()["connected"]:		#wait until connected
+ 		pass				#do nothing
+	setAlarm(0)						#comment, upon siren initialization, turn off the siren (bug fixes)
+	mqttclient.subscribe(topic)					#comment, subscribe to topic "siren"
+	
+	while True:						#comment, infinite loop with a predetermined delay
+		delay(defaultDelay)
+		
+if __name__ == "__main__":
+	main()

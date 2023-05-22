@@ -1,0 +1,271 @@
+import mqttclient							#comment, import mqtt library in order for mqtt comuunication to function properly
+from time import *
+from gpio import *
+from physical import *
+
+
+
+
+brokerAddress ='192.168.25.2'						#comment, Broker Address
+username= 'user1'							#comment, Username
+password = '1234'							#comment, Password
+topic0 = 'button0'							#comment,  topic to subscribe to, to retrieve keypad presses
+topic1 = 'button1'
+topic2 = 'button2'
+topic3 = 'button3'
+topic4 = 'button4'
+topic5 = 'button5'
+topic6 = 'button6'
+topic7 = 'button7'
+topic8 = 'button8'
+topic9 = 'button9'
+topic10 = 'buttonc'
+topic11 = 'buttone'
+topic12 = 'rfid'							#comment, Subscription topic for RFID number
+topic13 = 'gate'							#comment,  topic for gate activities, open with or without permission
+topic14 = 'guard'							#comment, topic to relay information to the cloud about guard state
+topic15 = 'siren'							#comment, to set the siren state
+firstRun = 1							#comment,  is this the device first time run? True needs pin setup
+pin = ""								#comment,  pin number, must be set during first-run
+keypadValue= ""							#comment, to capture the input pin number using the keypad
+rfids = ('1001','1002','1003')						#comment, list of authorized RFID cards
+
+guardState = 0							#comment, the security device state, armed or not armed
+wrongPin =0							#comment, a counter to keep track of wrong pin entries
+lockState=0							#comment, to keep track if the system is locked or not
+counter = 0							#comment, since mqtt subscription message work on interrup, we need to implement asynchronus counter for the loop
+wrongPinDelay = 0							#comment, to keep track whether wrong pin delay has been activated or not
+
+def on_connect(status, msg, packet):			#show connection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_disconnect(status, msg, packet):			#show disconnection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_subscribe(status, msg, packet):			#show subscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_unsubscribe(status, msg, packet):		#show unsubscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_publish(status, msg, packet):			#show publishing status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_message_received(status, msg, packet):  #Invoked when new message received
+									#comment,  check received message and take action accordingly
+									#comment, also get access to global variables
+	global keypadValue
+	global lockState
+	global guardState
+	global wrongPin
+	global wrongPinDelay
+	
+	if ((status == "Success" )& (lockState == 0)):				#comment, if we receive a message, we cannot take action unless the system
+		if (wrongPinDelay == 1):					#comment, is not locked; also we have to skip if a wrong pin delay is active
+			pass
+		elif(packet['topic'] == topic0):					#comment, keeping tarck of which button was pushed
+			keypadValue = keypadValue + "0"
+			updateLCD()
+		elif(packet['topic'] == topic1):
+			keypadValue = keypadValue + "1"
+			updateLCD()
+		elif(packet['topic'] == topic2):
+			keypadValue = keypadValue + "2"
+			updateLCD()
+		elif(packet['topic'] == topic3):
+			keypadValue = keypadValue + "3"
+			updateLCD()
+		elif(packet['topic'] == topic4):
+			keypadValue = keypadValue + "4"
+			updateLCD()
+		elif(packet['topic'] == topic5):
+			keypadValue = keypadValue + "5"
+			updateLCD()
+		elif(packet['topic'] == topic6):
+			keypadValue = keypadValue + "6"
+			updateLCD()
+		elif(packet['topic'] == topic7):
+			keypadValue = keypadValue + "7"
+			updateLCD()
+		elif(packet['topic'] == topic8):
+			keypadValue = keypadValue + "8"
+			updateLCD()
+		elif(packet['topic'] == topic9):
+			keypadValue = keypadValue + "9"
+			updateLCD()
+		elif(packet['topic'] == topic10):					#comment, this is when the clear button is pushed
+			keypadValue = ""
+			updateLCD()
+		elif(packet['topic'] == topic11):					#comment, upon pushing enter button
+			enterPin()
+		elif(packet['topic'] == topic13):					#comment, if the door opened while the system is armed or locked, activate siren
+			if ( (lockState == 1) | (guardState == 1) ):
+				mqttclient.publish(topic15,"1",'2')
+		elif(packet['topic'] == topic12):					#comment, upon receiving RFID card number, we have to check authorization
+			authorizedCard = -1
+			try:
+				authorizedCard = rfids.index(packet['payload'])
+				print(authorizedCard)
+			except ValueError:
+				pass
+			
+			if (lockState == 0):					#comment, if legible, check the lock state before arming/disarming the system
+				if (authorizedCard >= 0):
+					guardSystem()
+				elif (authorizedCard <0):
+					wrongPin = wrongPin +1		#comment, if not legible, increase the wrong pin counter and lock the system 
+					wrongPinDelay=1			#comment, if reached max retries
+					if(wrongPin == 3):
+						mqttclient.publish(topic15,"1",'2')
+						lockSystem()
+						
+					
+					
+
+	elif status == "" or status == "Error":
+		print msg
+	print msg
+		
+
+def enterPin():
+	global firstRun							#comment, prepare access to global variables
+	global keypadValue
+	global pin
+	global wrongPin
+	global wrongPinDelay
+	
+	if(keypadValue == ""):						#comment, if pin was not provided then clear the LCD screen
+		updateLCD()
+	elif(firstRun==1):							#comment, if pin value was provided and it is the first run, set the pin to the value
+		pin=keypadValue
+		firstRun=0
+		keypadValue=""
+		customWrite(0,"PIN is\nset")
+		#delay(1000)
+		#updateLCD()
+	elif(keypadValue == pin):						#comment, if this is not the first run, then compare with the pin and arm/disarm
+		keypadValue=""						#comment, the system accordingly
+		guardSystem()
+		updateLCD()
+	elif(keypadValue != pin):						#comment, if wrong pin, keep track of entries and trigger system lock if needed
+		wrongPin=wrongPin+1
+		wrongPinDelay=1
+		keypadValue=""
+		customWrite(0,"wrong pin!!!")
+		if(wrongPin == 3):
+			lockSystem()
+		
+def guardSystem():								#comment, guard system method, to arm or disarm the smart home system
+	global guardState							#comment, prepare access to global variables
+	global wrongPin
+	if(guardState == 0):							#comment, inverse the guard state, if arm then disarm and vise-versa
+		guardState = 1
+	else:
+		guardState=0
+		mqttclient.publish(topic15,'0','2')				#comment, turn off the siren upon disarming the system
+	wrongPin = 0
+	mqttclient.publish(topic14,str(guardState),'2')				#comment, publish the new guard state and reset wrong pin entries
+	updateLCD()
+		
+	
+def lockSystem():								 #comment, locking system method, triggered upon max pin wrong entries
+	global lockState							#comment, prepare access to global variables and reset wrong pin entries
+	global counter							#comment, and counter value, while setting lock state to true
+	global wrongPin
+	wrongPin = 0
+	lockState=1
+	counter=0
+
+	
+def updateLCD():								#comment, a method to show strings on a connected LCD screen
+	global firstRun							#comment, prepare access to global variables
+	global keypadValue
+	global guardState
+	if(firstRun == 1):							#comment, if first run and no keypad value entered then
+		if (keypadValue == ""):					#comment, tell the user to create a pin
+			customWrite(0,"Create a\npin")
+	if(keypadValue != ""):						#comment, if a pin is being pushed, display the pushed digits
+		customWrite(0,keypadValue)
+	elif(firstRun ==0):							#comment, if a pin is set then detect the guard state and display it
+		if(guardState==0):
+			customWrite(0,"System\ndisarmed")
+		else:
+			customWrite(0,"System\narmed")
+		
+
+
+		
+def main():
+	global lockState, counter, wrongPinDelay					#comment, prepare access to global variables
+	mqttclient.init()
+	mqttclient.onConnect(on_connect)
+	mqttclient.onDisconnect(on_disconnect)
+	mqttclient.onSubscribe(on_subscribe)
+	mqttclient.onUnsubscribe(on_unsubscribe)
+	mqttclient.onPublish(on_publish)
+	mqttclient.onMessageReceived(on_message_received)
+	print('Client Initialized')
+	mqttclient.connect(brokerAddress,username,password)
+	while not mqttclient.state()["connected"]:		#wait until connected
+ 		pass				#do nothing
+	mqttclient.subscribe(topic12)			#comment, subscribe to all required topics in order for the security device to function properly
+	delay(100)					#comment, a delay is implemented between subscription to not flood the MQTT broker
+	mqttclient.subscribe(topic13)
+	delay(100)
+	mqttclient.subscribe(topic0)
+	delay(100)
+	mqttclient.subscribe(topic1)
+	delay(100)
+	mqttclient.subscribe(topic2)
+	delay(100)
+	mqttclient.subscribe(topic3)
+	delay(100)
+	mqttclient.subscribe(topic4)
+	delay(100)
+	mqttclient.subscribe(topic5)
+	delay(100)
+	mqttclient.subscribe(topic6)
+	delay(100)
+	mqttclient.subscribe(topic7)
+	delay(100)
+	mqttclient.subscribe(topic8)
+	delay(100)
+	mqttclient.subscribe(topic9)
+	delay(100)
+	mqttclient.subscribe(topic10)
+	delay(100)
+	mqttclient.subscribe(topic11)
+	
+	updateLCD()				#comment, update the LCD upon first time run
+	while True:				#comment, infinite loop
+		delay(1000)
+		if(lockState==1):			#comment, is system is locked the activate a loop with 900 seconds counter
+			while counter<900:		
+				delay(1000)
+				counter=counter+1
+				customWrite(0,"system locked\n"+str(900-counter)+" seconds remaining")	#comment, display the remaining time before unlocking
+		lockState=0			#comment, after 900 seconds unlock the system
+		if (wrongPinDelay == 1):		#comment, if a wrong pin entry was made then delay the system of extra two seconds (total will become three)
+			delay(2000)
+			wrongPinDelay=0
+		
+if __name__ == "__main__":
+	main()

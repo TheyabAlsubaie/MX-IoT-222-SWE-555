@@ -1,0 +1,161 @@
+import mqttclient							#comment, import mqtt library in order for mqtt comuunication to function properly
+from time import *
+from gpio import *
+from physical import *
+
+
+
+
+brokerAddress='192.168.25.2'						#comment, Broker Address
+username= 'user1'							#comment, Username
+password = '1234'							#comment, Password
+topic = 'guard'							#comment, Subscription topic guard which is the security device state (armed/ not armed)
+topic2 ='gate'							#comment, the gate topic represent the door authorization state, 0 means openning the door 
+								#comment, while locked, while 1 means openning the door while the system is NOT armed
+doorState = 0 # 0 is closed, 1 is opened
+lockState = 0  # 0 is unlocked, 1 is locked
+
+def on_event_detect_0 () :
+    processData(customRead(0), False)
+
+def on_input_receive(input) :
+    processData(input, True)
+
+
+def mouseEvent (pressed, x, y, firstPress):
+    if firstPress:
+            if  doorState == 0 :
+                openDoor()
+            else:
+                closeDoor()
+
+def processData (data, bIsRemote):
+    if  len(data) < 1 :
+        return
+
+    print data
+
+    data = data.split(",")
+    doorStateData = int(data[0])
+    lockStateData = int(data[1])
+    if  lockStateData > -1 :
+        setLockState(lockStateData)
+
+    if  doorStateData > -1 and not bIsRemote :
+        if  doorStateData == 0 :
+            closeDoor()
+        else:
+            openDoor()
+
+
+def closeDoor ():
+    setDoorState(0)
+    updateEnvironment()
+
+
+def openDoor ():
+    if  lockState == 0 :
+        setDoorState(1)
+        mqttclient.publish(topic2,str(1),'2')
+    else:
+        print "can't open locked door"
+        mqttclient.publish(topic2,str(0),'2')
+
+
+def setDoorState (state):
+    global doorState
+    if  state == 0:
+        digitalWrite(1, LOW)
+        setComponentOpacity("led", 1)    # show the led
+    else:
+        digitalWrite(1, HIGH)
+        setComponentOpacity("led", 0)    # hide the led
+
+    doorState = state
+
+
+
+def setLockState (state):
+    global lockState
+    if  (state == 0) :
+        digitalWrite(2, LOW)
+    else:
+        digitalWrite(2, HIGH)
+    lockState = state
+
+
+
+def isPointInRectangle (x,y, rx, ry, width, height):
+    if width <= 0 or height <= 0:
+        return False
+    return (x >= rx and x <= rx + width and y >= ry and y <= ry + height)
+    ##
+
+def on_connect(status, msg, packet):			#show connection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_disconnect(status, msg, packet):			#show disconnection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_subscribe(status, msg, packet):			#show subscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_unsubscribe(status, msg, packet):		#show unsubscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_publish(status, msg, packet):			#show publishing status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_message_received(status, msg, packet):  #Invoked when new message received
+	# check received message and take action
+	if status == "Success":
+		if(packet['topic'] == topic):			#comment, when receiving a paylod about the security device setting (Arm/Disarm)
+			if(packet['payload'] == '1'):		#comment, when the system is armed, lock the door, while unlocking the door if Disarmed
+				setLockState(1)
+			elif(packet['payload'] == '0'):
+				setLockState(0)
+	elif status == "" or status == "Error":
+		print msg
+	print msg
+		
+
+
+
+		
+def main():
+	mqttclient.init()
+	mqttclient.onConnect(on_connect)
+	mqttclient.onDisconnect(on_disconnect)
+	mqttclient.onSubscribe(on_subscribe)
+	mqttclient.onUnsubscribe(on_unsubscribe)
+	mqttclient.onPublish(on_publish)
+	mqttclient.onMessageReceived(on_message_received)
+	print('Client Initialized')
+	mqttclient.connect(broker_add,username,password)
+	while not mqttclient.state()["connected"]:		#wait until connected
+ 		pass				#do nothing
+	mqttclient.subscribe(topic)
+	
+	while True:
+		delay(1000)
+		
+if __name__ == "__main__":
+	main()

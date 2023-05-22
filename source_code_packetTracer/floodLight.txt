@@ -1,0 +1,91 @@
+import mqttclient							#comment, import mqtt library in order for mqtt comuunication to function properly
+from time import *
+from gpio import *
+from physical import *
+
+
+
+
+brokerAddress ='192.168.25.2'						#comment, IP Address
+username= 'user1'							#comment, Username
+password = '1234'							#comment, Password
+topic = 'sensor1'							#comment, Subscription topic light
+lightLevel = 0							#comment,  default light level
+
+
+def on_connect(status, msg, packet):			#show connection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_disconnect(status, msg, packet):			#show disconnection status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_subscribe(status, msg, packet):			#show subscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_unsubscribe(status, msg, packet):		#show unsubscription status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+
+def on_publish(status, msg, packet):			#show publishing status
+	if status == "Success" or status == "Error":
+		print status + ": " + msg
+	elif status == "":
+		print msg
+	
+def on_message_received(status, msg, packet):  #Invoked when new message received
+	# check received message and take action
+	if status == "Success":
+		if(packet['topic'] == topic):			#comment, if the topic is the same as the related movement sensor
+			if(packet['payload'] == '1'):		#comment, set the light level accordingly
+				setLight(1)
+			elif(packet['payload'] == '0'):
+				setLight(0)
+	elif status == "" or status == "Error":
+		print msg
+	print msg
+		
+
+def setLight(value):						#comment, a method to receive the light level (0 off, 1 on) and apply it to the flood light object
+	if value==1:
+		setComponentOpacity("black", 0)
+	elif value==0:
+		setComponentOpacity("black", 1)
+
+
+		
+def main():
+	global lightlevel					#comment, to access lightlevel variable which is a global variable
+	mqttclient.init()
+	mqttclient.onConnect(on_connect)
+	mqttclient.onDisconnect(on_disconnect)
+	mqttclient.onSubscribe(on_subscribe)
+	mqttclient.onUnsubscribe(on_unsubscribe)
+	mqttclient.onPublish(on_publish)
+	mqttclient.onMessageReceived(on_message_received)
+	print('Client Initialized')
+	#delay(60000);
+	mqttclient.connect(brokerAddress,username,password)
+	while not mqttclient.state()["connected"]:			#wait until connected
+ 		pass					#do nothing
+	setLight(0)					#comment, at the begining of the script, set the light level to off, to reset the status upon object crash
+	mqttclient.subscribe(topic)
+	
+	while True:					#comment, infinite loop with a 1 second delay
+		delay(1000)
+		
+if __name__ == "__main__":
+	main()
